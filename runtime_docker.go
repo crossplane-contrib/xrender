@@ -83,7 +83,7 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 
 	// Find a random, available port. There's a chance of a race here, where
 	// something else binds to the port before we start our container.
-	lis, err := net.Listen("tcp", ":0") //nolint:gosec // We're only doing this briefly to find a port.
+	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return RuntimeContext{}, errors.Wrap(err, "cannot get available TCP port")
 	}
