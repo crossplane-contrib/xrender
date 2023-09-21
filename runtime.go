@@ -3,7 +3,27 @@ package main
 import (
 	"context"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	pkgv1beta1 "github.com/crossplane/crossplane/apis/pkg/v1beta1"
+)
+
+// AnnotationKeyRuntime can be added to a Function to control what runtime is
+// used to run it locally.
+const AnnotationKeyRuntime = "xrender.crossplane.io/runtime"
+
+// Supported runtimes.
+const (
+	AnnotationValueRuntimeDefault = "" // Docker is the default.
+
+	// The Docker runtime uses a Docker daemon to run a Function. It uses the
+	// standard DOCKER_ environment variables to determine how to connect to the
+	// daemon.
+	AnnotationValueRuntimeDocker = "Docker"
+
+	// The Development runtime expects you to deploy a Function locally. This is
+	// mostly useful when developing a Function. The Function must be running
+	// with the --insecure flag, i.e. without transport security.
+	AnnotationValueRuntimeDevelopment = "Development"
 )
 
 // A Runtime runs a Function.
@@ -17,12 +37,18 @@ type RuntimeContext struct {
 	// Target for RunFunctionRequest gRPCs.
 	Target string
 
-	// Stop the running Function
+	// Stop the running Function.
 	Stop func(context.Context) error
 }
 
 // GetRuntime for the supplied Function, per its annotations.
-func GetRuntime(fn pkgv1beta1.Function) (Runtime, error) { //nolint:unparam // We will likely want an error here in future for other GetRuntime variants.
-	// TODO(negz): Support other runtimes based on annotation.
-	return GetRuntimeDocker(fn), nil
+func GetRuntime(fn pkgv1beta1.Function) (Runtime, error) {
+	switch r := fn.GetAnnotations()[AnnotationKeyRuntime]; r {
+	case AnnotationValueRuntimeDocker, AnnotationValueRuntimeDefault:
+		return GetRuntimeDocker(fn), nil
+	case AnnotationValueRuntimeDevelopment:
+		return GetRuntimeDevelopment(fn), nil
+	default:
+		return nil, errors.Errorf("unsupported %q annotation value %q (unknown runtime)", AnnotationKeyRuntime, r)
+	}
 }
