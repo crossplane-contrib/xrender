@@ -119,8 +119,8 @@ The Development runtime supports the following additional annotation:
 * `xrender.crossplane.io/runtime-development-target` - The gRPC 'target' address
   at which the Function is listening. The default is `localhost:9443`.
 
-Note that the Development requires the Function to be listening in `--insecure`
-mode, i.e. without mTLS transport security.
+Note that the Development runtime requires the Function to be listening in
+`--insecure` mode, i.e. without mTLS transport security.
 
 For example:
 
