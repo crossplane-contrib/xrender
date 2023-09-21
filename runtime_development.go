@@ -6,6 +6,7 @@ import (
 	pkgv1beta1 "github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
+// Annotations that can be used to configure the Development runtime.
 const (
 	// AnnotationKeyRuntimeDevelopmentTarget can be used to configure the gRPC
 	// target where the Function is listening. The default is localhost:9443.

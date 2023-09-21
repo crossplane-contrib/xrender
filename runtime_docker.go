@@ -15,23 +15,53 @@ import (
 	pkgv1beta1 "github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
+// Annotations that can be used to configure the Docker runtime.
+const (
+	// AnnotationKeyRuntimeDockerCleanup configures how a Function's Docker
+	// container should be cleaned up once rendering is done.
+	AnnotationKeyRuntimeDockerCleanup = "xrender.crossplane.io/runtime-docker-cleanup"
+
+	// AnnotationKeyRuntimeDockerImage overrides the Docker image that will be
+	// used to run the Function. By default xrender assumes the Function package
+	// (i.e. spec.package) can be used to run the Function.
+	AnnotationKeyRuntimeDockerImage = "xrender.crossplane.io/runtime-docker-image"
+)
+
+// Supported AnnotationKeyRuntimeDockerCleanup values.
+const (
+	// AnnotationValueRuntimeDockerCleanupStop is the default. It stops the
+	// container once rendering is done.
+	AnnotationValueRuntimeDockerCleanupStop = "Stop"
+
+	// AnnotationValueRuntimeDockerCleanupOrphan leaves the container running
+	// once rendering is done.
+	AnnotationValueRuntimeDockerCleanupOrphan = "Orphan"
+)
+
 // RuntimeDocker uses a Docker daemon to run a Function.
 type RuntimeDocker struct {
 	// Image to run
 	Image string
 
-	// Stop container when
+	// Stop container once rendering is done
 	Stop bool
 }
 
 // GetRuntimeDocker extracts RuntimeDocker configuration from the supplied
 // Function.
 func GetRuntimeDocker(fn pkgv1beta1.Function) *RuntimeDocker {
-	// TODO(negz): Support overriding with annotations.
-	// TODO(negz): Pull package in case it has a different controller image?
+	// TODO(negz): Pull package in case it has a different controller image? I
+	// hope in most cases Functions will use 'fat' packages, and it's possible
+	// to manually override with an annotation so maybe not worth it.
 	r := &RuntimeDocker{
 		Image: fn.Spec.Package,
 		Stop:  true,
+	}
+	if i := fn.GetAnnotations()[AnnotationKeyRuntimeDockerImage]; i != "" {
+		r.Image = i
+	}
+	if fn.GetAnnotations()[AnnotationKeyRuntimeDockerCleanup] == AnnotationValueRuntimeDockerCleanupOrphan {
+		r.Stop = false
 	}
 	return r
 }
@@ -75,7 +105,7 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 		PortBindings: bind,
 	}
 
-	// TODO(negz): Set a container name. Presumably unique across runs.
+	// TODO(negz): Set a container name? Presumably unique across runs.
 	rsp, err := c.ContainerCreate(ctx, cfg, hcfg, nil, nil, "")
 	if err != nil {
 		return RuntimeContext{}, errors.Wrap(err, "cannot create Docker container")
