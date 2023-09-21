@@ -28,6 +28,14 @@ const waitForReady = `{
 	}]
 }`
 
+// Annotations added to composed resources.
+const (
+	AnnotationKeyCompositionResourceName = "crossplane.io/composition-resource-name"
+	AnnotationKeyCompositeName           = "crossplane.io/composite"
+	AnnotationKeyClaimNamespace          = "crossplane.io/claim-namespace"
+	AnnotationKeyClaimName               = "crossplane.io/claim-name"
+)
+
 // RenderInputs contains all inputs to the render process.
 type RenderInputs struct {
 	CompositeResource *composite.Unstructured
@@ -56,8 +64,6 @@ type RenderOutputs struct {
 // Render the desired XR and composed resources given the supplied inputs.
 func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nolint:gocyclo // TODO(negz): Should we refactor to break this up a bit?
 
-	// TODO(negz): Break running Functions out of rendering?
-
 	// Run our Functions. They'll stop running when the context is cancelled.
 	conns := map[string]*grpc.ClientConn{}
 	for _, fn := range in.Functions {
@@ -77,12 +83,13 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 		if err != nil {
 			return RenderOutputs{}, errors.Wrapf(err, "cannot dial Function %q at address %q", fn.GetName(), rctx.Target)
 		}
+		defer conn.Close() //nolint:errcheck // This only returns an error if the connection is already closed or closing.
 		conns[fn.GetName()] = conn
 	}
 
 	observed := map[string]composed.Unstructured{}
 	for _, cd := range in.ObservedResources {
-		name := cd.GetAnnotations()["crossplane.io/composition-resource-name"]
+		name := cd.GetAnnotations()[AnnotationKeyCompositionResourceName]
 		observed[name] = cd
 	}
 
@@ -180,12 +187,12 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 // https://github.com/crossplane/crossplane/blob/0965f0/internal/controller/apiextensions/composite/composition_render.go#L117
 func RenderComposedResourceMetadata(cd resource.Object, xr resource.Composite, name string) error {
 	cd.SetGenerateName(xr.GetName() + "-")
-	meta.AddAnnotations(cd, map[string]string{"crossplane.io/composition-resource-name": name})
-	meta.AddLabels(cd, map[string]string{"crossplane.io/composite": xr.GetName()})
+	meta.AddAnnotations(cd, map[string]string{AnnotationKeyCompositionResourceName: name})
+	meta.AddLabels(cd, map[string]string{AnnotationKeyCompositeName: xr.GetName()})
 	if ref := xr.GetClaimReference(); ref != nil {
 		meta.AddLabels(cd, map[string]string{
-			"crossplane.io/claim-namespace": ref.Namespace,
-			"crossplane.io/claim-name":      ref.Name,
+			AnnotationKeyClaimNamespace: ref.Namespace,
+			AnnotationKeyClaimName:      ref.Name,
 		})
 	}
 

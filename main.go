@@ -71,6 +71,13 @@ func (c *CLI) Run() error { //nolint:gocyclo // Only a touch over.
 		return errors.Wrap(err, "cannot render composite resource")
 	}
 
+	// TODO(negz): Right now we're just emitting the desired state, which is an
+	// overlay on the observed state. Would it be more useful to apply the
+	// overlay to show something more like what the final result would be? The
+	// challenge with that would be that we'd have to try emulate what
+	// server-side apply would do (e.g. merging vs atomically replacing arrays)
+	// and we don't have enough context (i.e. OpenAPI schemas) to do that.
+
 	y, err := yaml.Marshal(out.CompositeResource.GetUnstructured())
 	if err != nil {
 		return errors.Wrapf(err, "cannot marshal composite resource %q to YAML", xr.GetName())
