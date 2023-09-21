@@ -64,7 +64,7 @@ type RenderOutputs struct {
 // Render the desired XR and composed resources given the supplied inputs.
 func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nolint:gocyclo // TODO(negz): Should we refactor to break this up a bit?
 
-	// Run our Functions. They'll stop running when the context is cancelled.
+	// Run our Functions.
 	conns := map[string]*grpc.ClientConn{}
 	for _, fn := range in.Functions {
 		runtime, err := GetRuntime(fn)
@@ -105,7 +105,7 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 
 	// Run any Composition Functions in the pipeline. Each Function may mutate
 	// the desired state returned by the last, and each Function may produce
-	// results that will be emitted as events.
+	// results.
 	for _, fn := range in.Composition.Spec.Pipeline {
 		req := &fnv1beta1.RunFunctionRequest{Observed: o, Desired: d}
 
@@ -129,8 +129,7 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 
 		d = rsp.GetDesired()
 
-		// Results of fatal severity stop the Composition process. Other results
-		// are accumulated to be emitted as events by the Reconciler.
+		// Results of fatal severity stop the Composition process.
 		for _, rs := range rsp.Results {
 			switch rs.Severity { //nolint:exhaustive // We intentionally have a broad default case.
 			case fnv1beta1.Severity_SEVERITY_FATAL:
