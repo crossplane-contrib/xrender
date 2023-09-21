@@ -1,6 +1,6 @@
-apiVersion: nop.example.org/v1alpha1
-kind: XNopResource
+apiVersion: nopexample.org/v1
+kind: XBucket
 metadata:
   name: test-xrender
 spec:
-  coolField: "I'm cool!"
+  bucketRegion: us-east-2

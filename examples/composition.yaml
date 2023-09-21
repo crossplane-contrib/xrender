@@ -19,20 +19,15 @@ spec:
       # overlay the desired state on any that was passed into it.
       response:
         desired:
+          composite:
+            resource:
+              status:
+                bucketRegion: us-east-2
           resources:
-            nop-resource-1:
+            my-bucket:
               resource:
-                apiVersion: nop.crossplane.io/v1alpha1
-                kind: NopResource
+                apiVersion: s3.aws.upbound.io/v1beta1
+                kind: Bucket
                 spec:
                   forProvider:
-                    conditionAfter:
-                    - conditionType: Ready
-                      conditionStatus: "False"
-                      time: 0s
-                    - conditionType: Ready
-                      conditionStatus: "True"
-                      time: 10s
-  - step: automatically-detect-ready-composed-resources
-    functionRef:
-      name: function-auto-ready
+                    region: us-east-2
