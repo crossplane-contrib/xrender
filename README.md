@@ -98,6 +98,22 @@ The Docker runtime supports the following additional annotations:
 * `xrender.crossplane.io/runtime-docker-image` - Override the image used to run
   the Function. The Function's `spec.package` is used by default.
 
+For example:
+
+```yaml
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-dummy
+  annotations:
+    xrender.crossplane.io/runtime: Docker
+    xrender.crossplane.io/runtime-docker-cleanup: Orphan
+    xrender.crossplane.io/runtime-docker-image: 690d376c2b2a # Some local image build.
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-dummy:v0.2.1
+```
+
 The Development runtime supports the following additional annotation:
 
 * `xrender.crossplane.io/runtime-development-target` - The gRPC 'target' address
@@ -105,3 +121,18 @@ The Development runtime supports the following additional annotation:
 
 Note that the Development requires the Function to be listening in `--insecure`
 mode, i.e. without mTLS transport security.
+
+For example:
+
+```yaml
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-dummy
+  annotations:
+    xrender.crossplane.io/runtime: Development
+    xrender.crossplane.io/runtime-development-target: localhost:9443 # A Function running locally
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-dummy:v0.2.1
+```
