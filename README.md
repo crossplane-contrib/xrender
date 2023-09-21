@@ -136,3 +136,12 @@ metadata:
 spec:
   package: xpkg.upbound.io/crossplane-contrib/function-dummy:v0.2.1
 ```
+
+## Future Improvements
+
+`xrender` is an early implementation. It doesn't yet support:
+
+* Automatically rendering nested XRs.
+* Rendering the XR's connection details.
+* Determining whether the XR would be considered ready.
+* Providing mocked observed composed resource connection details.
