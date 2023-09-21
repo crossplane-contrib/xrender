@@ -1,4 +1,4 @@
-module github.com/negz/xrender
+module github.com/crossplane-contrib/xrender
 
 go 1.20
 
@@ -8,6 +8,7 @@ require (
 	github.com/crossplane/crossplane-runtime v1.14.0-rc.0.0.20230908095748-e646d73c92a5
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/google/go-cmp v0.5.9
 	google.golang.org/grpc v1.58.1
 	google.golang.org/protobuf v1.31.0
 	k8s.io/apimachinery v0.28.2
@@ -30,7 +31,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

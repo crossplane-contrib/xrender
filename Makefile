@@ -2,7 +2,7 @@
 # Setup Project
 
 PROJECT_NAME := xrender
-PROJECT_REPO := github.com/negz/$(PROJECT_NAME)
+PROJECT_REPO := github.com/crossplane-contrib/$(PROJECT_NAME)
 
 PLATFORMS ?= linux_amd64 linux_arm64 linux_arm linux_ppc64le darwin_amd64 darwin_arm64 windows_amd64
 # -include will silently skip missing files, which allows us

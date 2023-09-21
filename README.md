@@ -4,7 +4,7 @@ Locally render any XR that uses Composition Functions.
 
 ```shell
 # Install xrender
-$ go install github.com/negz/xrender@latest
+$ go install github.com/crossplane-contrib/xrender@latest
 
 # See how to use it
 $ xrender --help
