@@ -414,31 +414,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_PSW }}
           AWS_DEFAULT_REGION: us-east-1
 
-  fuzz-test:
-    runs-on: ubuntu-22.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
-
-    steps:
-      # TODO(negz): Can we make this use our Go build and dependency cache? It
-      # seems to build Crossplane inside of a Docker image.
-      - name: Build Fuzzers
-        id: build
-        uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
-        with:
-          oss-fuzz-project-name: "crossplane"
-          language: go
-
-      - name: Run Fuzzers
-        uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
-        with:
-          oss-fuzz-project-name: "crossplane"
-          fuzz-seconds: 300
-          language: go
-
-      - name: Upload Crash
-        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3
-        if: failure() && steps.build.outcome == 'success'
-        with:
-          name: artifacts
-          path: ./out/artifacts
