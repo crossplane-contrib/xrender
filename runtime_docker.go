@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -75,11 +76,13 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 		return RuntimeContext{}, errors.Wrap(err, "cannot create Docker client using environment variables")
 	}
 
-	out, err := c.ImagePull(ctx, r.Image, types.ImagePullOptions{})
-	if err != nil {
-		return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+	if found := strings.Contains(r.Image, "/"); found {
+		out, err := c.ImagePull(ctx, r.Image, types.ImagePullOptions{})
+		if err != nil {
+			return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+		}
+		defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
 	}
-	defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
 
 	// Find a random, available port. There's a chance of a race here, where
 	// something else binds to the port before we start our container.
