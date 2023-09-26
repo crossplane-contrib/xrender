@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/docker/docker/api/types"
@@ -80,6 +81,15 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 		return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
 	}
 	defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
+
+	// Each line read from out is a JSON object containing the status of the
+	// pull - similar to the progress bars you'd see if running docker pull. It
+	// seems that consuming all of this output is the best way to block until
+	// the image is actually pulled before we try to run it.
+	if _, err := io.Copy(io.Discard, out); err != nil {
+		// TODO(negz): What would actually cause this error?
+		return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+	}
 
 	// Find a random, available port. There's a chance of a race here, where
 	// something else binds to the port before we start our container.
