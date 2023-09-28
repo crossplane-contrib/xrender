@@ -22,9 +22,9 @@ type CLI struct {
 
 	CompositeResource string `arg:"" type:"existingfile" help:"A YAML manifest containing the Composite Resource (XR) to render."`
 	Composition       string `arg:"" type:"existingfile" help:"A YAML manifest containing the Composition to use. Must be mode: Pipeline."`
-	Functions         string `arg:"" type:"existingfile" help:"A YAML stream of manifests containing the Composition Functions to use."`
+	Functions         string `arg:"" help:"A stream or directory of YAML manifests containing the Composition Functions to use."`
 
-	ObservedResources string `short:"o" type:"existingfile" help:"An optional YAML stream of manifests mocking the observed state of composed resources."`
+	ObservedResources []string `short:"o" help:"An optional stream or directory of YAML manifests mocking the observed state of composed resources."`
 }
 
 // Run xrender.
@@ -51,10 +51,10 @@ func (c *CLI) Run() error { //nolint:gocyclo // Only a touch over.
 	}
 
 	ors := []composed.Unstructured{}
-	if c.ObservedResources != "" {
-		ors, err = LoadObservedResources(c.ObservedResources)
+	for i := range c.ObservedResources {
+		ors, err = LoadObservedResources(c.ObservedResources[i])
 		if err != nil {
-			return errors.Wrapf(err, "cannot load observed composed resources from %q", c.ObservedResources)
+			return errors.Wrapf(err, "cannot load observed composed resources from %q", c.ObservedResources[i])
 		}
 	}
 
