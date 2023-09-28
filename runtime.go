@@ -46,7 +46,7 @@ type RuntimeContext struct {
 func GetRuntime(fn pkgv1beta1.Function) (Runtime, error) {
 	switch r := fn.GetAnnotations()[AnnotationKeyRuntime]; r {
 	case AnnotationValueRuntimeDocker, AnnotationValueRuntimeDefault:
-		return GetRuntimeDocker(fn), nil
+		return GetRuntimeDocker(fn)
 	case AnnotationValueRuntimeDevelopment:
 		return GetRuntimeDevelopment(fn), nil
 	default:

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -39,6 +40,24 @@ const (
 	AnnotationValueRuntimeDockerCleanupOrphan = "Orphan"
 )
 
+// AnnotationKeyRuntimeDockerPullPolicy can be added to a Function to control how its runtime
+// image is pulled.
+const AnnotationKeyRuntimeDockerPullPolicy = "xrender.crossplane.io/runtime-docker-pull-policy"
+
+// PullPolicy can be added to a Function to control how its runtime image is
+type PullPolicy string
+
+// Supported pull policies.
+const (
+	// Always pull the image.
+	AnnotationValueRuntimeDockerPullPolicyAlways PullPolicy = "Always"
+	// Never pull the image.
+	AnnotationValueRuntimeDockerPullPolicyNever PullPolicy = "Never"
+	// Pull the image if it's not present.
+	AnnotationValueRuntimeDockerPullPolicyIfNotPresent PullPolicy = "IfNotPresent"
+	AnnotationValueRuntimeDockerPullPolicyDefault      PullPolicy = AnnotationValueRuntimeDockerPullPolicyIfNotPresent
+)
+
 // RuntimeDocker uses a Docker daemon to run a Function.
 type RuntimeDocker struct {
 	// Image to run
@@ -46,17 +65,37 @@ type RuntimeDocker struct {
 
 	// Stop container once rendering is done
 	Stop bool
+
+	// PullPolicy controls how the runtime image is pulled.
+	PullPolicy PullPolicy
+}
+
+// GetPullPolicy extracts PullPolicy configuration from the supplied Function.
+func GetPullPolicy(fn pkgv1beta1.Function) (PullPolicy, error) {
+	switch p := fn.GetAnnotations()[AnnotationKeyRuntimeDockerPullPolicy]; p {
+	case string(AnnotationValueRuntimeDockerPullPolicyAlways), string(AnnotationValueRuntimeDockerPullPolicyNever), string(AnnotationValueRuntimeDockerPullPolicyIfNotPresent):
+		return PullPolicy(p), nil
+	case "":
+		return AnnotationValueRuntimeDockerPullPolicyDefault, nil
+	default:
+		return "", errors.Errorf("unsupported %q annotation value %q (unknown pull policy)", AnnotationKeyRuntimeDockerPullPolicy, p)
+	}
 }
 
 // GetRuntimeDocker extracts RuntimeDocker configuration from the supplied
 // Function.
-func GetRuntimeDocker(fn pkgv1beta1.Function) *RuntimeDocker {
+func GetRuntimeDocker(fn pkgv1beta1.Function) (*RuntimeDocker, error) {
 	// TODO(negz): Pull package in case it has a different controller image? I
 	// hope in most cases Functions will use 'fat' packages, and it's possible
 	// to manually override with an annotation so maybe not worth it.
+	pullPolicy, err := GetPullPolicy(fn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get pull policy for Function %q", fn.GetName())
+	}
 	r := &RuntimeDocker{
-		Image: fn.Spec.Package,
-		Stop:  true,
+		Image:      fn.Spec.Package,
+		Stop:       true,
+		PullPolicy: pullPolicy,
 	}
 	if i := fn.GetAnnotations()[AnnotationKeyRuntimeDockerImage]; i != "" {
 		r.Image = i
@@ -64,31 +103,16 @@ func GetRuntimeDocker(fn pkgv1beta1.Function) *RuntimeDocker {
 	if fn.GetAnnotations()[AnnotationKeyRuntimeDockerCleanup] == AnnotationValueRuntimeDockerCleanupOrphan {
 		r.Stop = false
 	}
-	return r
+	return r, nil
 }
 
 var _ Runtime = &RuntimeDocker{}
 
 // Start a Function as a Docker container.
-func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
+func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) { //nolint:gocyclo // TODO(phisco): Refactor to break this up a bit, not so easy.
 	c, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return RuntimeContext{}, errors.Wrap(err, "cannot create Docker client using environment variables")
-	}
-
-	out, err := c.ImagePull(ctx, r.Image, types.ImagePullOptions{})
-	if err != nil {
-		return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
-	}
-	defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
-
-	// Each line read from out is a JSON object containing the status of the
-	// pull - similar to the progress bars you'd see if running docker pull. It
-	// seems that consuming all of this output is the best way to block until
-	// the image is actually pulled before we try to run it.
-	if _, err := io.Copy(io.Discard, out); err != nil {
-		// TODO(negz): What would actually cause this error?
-		return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
 	}
 
 	// Find a random, available port. There's a chance of a race here, where
@@ -115,10 +139,30 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 		PortBindings: bind,
 	}
 
+	if r.PullPolicy == AnnotationValueRuntimeDockerPullPolicyAlways {
+		err = r.pullImage(ctx, c)
+		if err != nil {
+			return RuntimeContext{}, err
+		}
+	}
+
 	// TODO(negz): Set a container name? Presumably unique across runs.
 	rsp, err := c.ContainerCreate(ctx, cfg, hcfg, nil, nil, "")
 	if err != nil {
-		return RuntimeContext{}, errors.Wrap(err, "cannot create Docker container")
+		if !errdefs.IsNotFound(err) || r.PullPolicy == AnnotationValueRuntimeDockerPullPolicyNever {
+			return RuntimeContext{}, errors.Wrap(err, "cannot create Docker container")
+		}
+
+		// The image was not found, but we're allowed to pull it.
+		err = r.pullImage(ctx, c)
+		if err != nil {
+			return RuntimeContext{}, err
+		}
+
+		rsp, err = c.ContainerCreate(ctx, cfg, hcfg, nil, nil, "")
+		if err != nil {
+			return RuntimeContext{}, errors.Wrap(err, "cannot create Docker container")
+		}
 	}
 
 	if err := c.ContainerStart(ctx, rsp.ID, types.ContainerStartOptions{}); err != nil {
@@ -137,4 +181,22 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) {
 	}
 
 	return RuntimeContext{Target: addr, Stop: stop}, nil
+}
+
+func (r *RuntimeDocker) pullImage(ctx context.Context, c *client.Client) error {
+	out, err := c.ImagePull(ctx, r.Image, types.ImagePullOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+	}
+	defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
+
+	// Each line read from out is a JSON object containing the status of the
+	// pull - similar to the progress bars you'd see if running docker pull. It
+	// seems that consuming all of this output is the best way to block until
+	// the image is actually pulled before we try to run it.
+	if _, err := io.Copy(io.Discard, out); err != nil {
+		// TODO(negz): What would actually cause this error?
+		return errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+	}
+	return nil
 }
