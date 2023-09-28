@@ -164,9 +164,9 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) { //n
 	}
 
 	if r.PullPolicy == AnnotationValueRuntimeDockerPullPolicyAlways {
-		err = r.pullImage(ctx, c)
+		err = PullImage(ctx, c, r.Image)
 		if err != nil {
-			return RuntimeContext{}, err
+			return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
 		}
 	}
 
@@ -178,9 +178,9 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) { //n
 		}
 
 		// The image was not found, but we're allowed to pull it.
-		err = r.pullImage(ctx, c)
+		err = PullImage(ctx, c, r.Image)
 		if err != nil {
-			return RuntimeContext{}, err
+			return RuntimeContext{}, errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
 		}
 
 		rsp, err = c.ContainerCreate(ctx, cfg, hcfg, nil, nil, "")
@@ -207,10 +207,12 @@ func (r *RuntimeDocker) Start(ctx context.Context) (RuntimeContext, error) { //n
 	return RuntimeContext{Target: addr, Stop: stop}, nil
 }
 
-func (r *RuntimeDocker) pullImage(ctx context.Context, c *client.Client) error {
-	out, err := c.ImagePull(ctx, r.Image, types.ImagePullOptions{})
+// PullImage pulls the supplied image using the supplied client. It blocks until
+// the image has either finished pulling or hit an error.
+func PullImage(ctx context.Context, c *client.Client, image string) error {
+	out, err := c.ImagePull(ctx, image, types.ImagePullOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
+		return err
 	}
 	defer out.Close() //nolint:errcheck // TODO(negz): Can this error?
 
@@ -218,9 +220,6 @@ func (r *RuntimeDocker) pullImage(ctx context.Context, c *client.Client) error {
 	// pull - similar to the progress bars you'd see if running docker pull. It
 	// seems that consuming all of this output is the best way to block until
 	// the image is actually pulled before we try to run it.
-	if _, err := io.Copy(io.Discard, out); err != nil {
-		// TODO(negz): What would actually cause this error?
-		return errors.Wrapf(err, "cannot pull Docker image %q", r.Image)
-	}
-	return nil
+	_, err = io.Copy(io.Discard, out)
+	return err
 }
