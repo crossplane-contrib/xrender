@@ -18,7 +18,7 @@ import (
 // CLI arguments and flags for xrender.
 type CLI struct {
 	Debug   bool          `short:"d" help:"Emit debug logs in addition to info logs."`
-	Timeout time.Duration `help:"How long to run before timing out." default:"3m"`
+	Timeout time.Duration `help:"How long to run before timing out." default:"1m"`
 
 	CompositeResource string `arg:"" type:"existingfile" help:"A YAML manifest containing the Composite Resource (XR) to render."`
 	Composition       string `arg:"" type:"existingfile" help:"A YAML manifest containing the Composition to use. Must be mode: Pipeline."`
