@@ -147,8 +147,8 @@ func TestLoadFunctions(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "function-auto-ready",
 							Annotations: map[string]string{
-								AnnotationKeyRuntime:              AnnotationValueRuntimeDocker,
-								AnnotationKeyRuntimeDockerCleanup: AnnotationValueRuntimeDockerCleanupOrphan,
+								AnnotationKeyRuntime:              string(AnnotationValueRuntimeDocker),
+								AnnotationKeyRuntimeDockerCleanup: string(AnnotationValueRuntimeDockerCleanupOrphan),
 							},
 						},
 						Spec: pkgv1beta1.FunctionSpec{
@@ -165,7 +165,7 @@ func TestLoadFunctions(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "function-dummy",
 							Annotations: map[string]string{
-								AnnotationKeyRuntime:                  AnnotationValueRuntimeDevelopment,
+								AnnotationKeyRuntime:                  string(AnnotationValueRuntimeDevelopment),
 								AnnotationKeyRuntimeDevelopmentTarget: "localhost:9444",
 							},
 						},

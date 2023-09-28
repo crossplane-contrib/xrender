@@ -12,19 +12,22 @@ import (
 // used to run it locally.
 const AnnotationKeyRuntime = "xrender.crossplane.io/runtime"
 
+// RuntimeType is a type of Function runtime.
+type RuntimeType string
+
 // Supported runtimes.
 const (
-	AnnotationValueRuntimeDefault = "" // Docker is the default.
-
 	// The Docker runtime uses a Docker daemon to run a Function. It uses the
 	// standard DOCKER_ environment variables to determine how to connect to the
 	// daemon.
-	AnnotationValueRuntimeDocker = "Docker"
+	AnnotationValueRuntimeDocker RuntimeType = "Docker"
 
 	// The Development runtime expects you to deploy a Function locally. This is
 	// mostly useful when developing a Function. The Function must be running
 	// with the --insecure flag, i.e. without transport security.
-	AnnotationValueRuntimeDevelopment = "Development"
+	AnnotationValueRuntimeDevelopment RuntimeType = "Development"
+
+	AnnotationValueRuntimeDefault = AnnotationValueRuntimeDocker
 )
 
 // A Runtime runs a Function.
@@ -44,8 +47,8 @@ type RuntimeContext struct {
 
 // GetRuntime for the supplied Function, per its annotations.
 func GetRuntime(fn pkgv1beta1.Function) (Runtime, error) {
-	switch r := fn.GetAnnotations()[AnnotationKeyRuntime]; r {
-	case AnnotationValueRuntimeDocker, AnnotationValueRuntimeDefault:
+	switch r := RuntimeType(fn.GetAnnotations()[AnnotationKeyRuntime]); r {
+	case AnnotationValueRuntimeDocker, "":
 		return GetRuntimeDocker(fn)
 	case AnnotationValueRuntimeDevelopment:
 		return GetRuntimeDevelopment(fn), nil

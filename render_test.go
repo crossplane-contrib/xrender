@@ -114,7 +114,7 @@ func TestRender(t *testing.T) {
 								ObjectMeta: metav1.ObjectMeta{
 									Name: "function-test",
 									Annotations: map[string]string{
-										AnnotationKeyRuntime:                  AnnotationValueRuntimeDevelopment,
+										AnnotationKeyRuntime:                  string(AnnotationValueRuntimeDevelopment),
 										AnnotationKeyRuntimeDevelopmentTarget: lis.Addr().String(),
 									},
 								},
@@ -185,7 +185,7 @@ func TestRender(t *testing.T) {
 								ObjectMeta: metav1.ObjectMeta{
 									Name: "function-test",
 									Annotations: map[string]string{
-										AnnotationKeyRuntime:                  AnnotationValueRuntimeDevelopment,
+										AnnotationKeyRuntime:                  string(AnnotationValueRuntimeDevelopment),
 										AnnotationKeyRuntimeDevelopmentTarget: lis.Addr().String(),
 									},
 								},

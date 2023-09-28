@@ -29,33 +29,43 @@ const (
 	AnnotationKeyRuntimeDockerImage = "xrender.crossplane.io/runtime-docker-image"
 )
 
+// DockerCleanup specifies what Docker should do with a Function container after
+// it has been run.
+type DockerCleanup string
+
 // Supported AnnotationKeyRuntimeDockerCleanup values.
 const (
 	// AnnotationValueRuntimeDockerCleanupStop is the default. It stops the
 	// container once rendering is done.
-	AnnotationValueRuntimeDockerCleanupStop = "Stop"
+	AnnotationValueRuntimeDockerCleanupStop DockerCleanup = "Stop"
 
 	// AnnotationValueRuntimeDockerCleanupOrphan leaves the container running
 	// once rendering is done.
-	AnnotationValueRuntimeDockerCleanupOrphan = "Orphan"
+	AnnotationValueRuntimeDockerCleanupOrphan DockerCleanup = "Orphan"
+
+	AnnotationValueRuntimeDockerCleanupDefault = AnnotationValueRuntimeDockerCleanupStop
 )
 
 // AnnotationKeyRuntimeDockerPullPolicy can be added to a Function to control how its runtime
 // image is pulled.
 const AnnotationKeyRuntimeDockerPullPolicy = "xrender.crossplane.io/runtime-docker-pull-policy"
 
-// PullPolicy can be added to a Function to control how its runtime image is
-type PullPolicy string
+// DockerPullPolicy can be added to a Function to control how its runtime image
+// is pulled by Docker.
+type DockerPullPolicy string
 
 // Supported pull policies.
 const (
 	// Always pull the image.
-	AnnotationValueRuntimeDockerPullPolicyAlways PullPolicy = "Always"
+	AnnotationValueRuntimeDockerPullPolicyAlways DockerPullPolicy = "Always"
+
 	// Never pull the image.
-	AnnotationValueRuntimeDockerPullPolicyNever PullPolicy = "Never"
+	AnnotationValueRuntimeDockerPullPolicyNever DockerPullPolicy = "Never"
+
 	// Pull the image if it's not present.
-	AnnotationValueRuntimeDockerPullPolicyIfNotPresent PullPolicy = "IfNotPresent"
-	AnnotationValueRuntimeDockerPullPolicyDefault      PullPolicy = AnnotationValueRuntimeDockerPullPolicyIfNotPresent
+	AnnotationValueRuntimeDockerPullPolicyIfNotPresent DockerPullPolicy = "IfNotPresent"
+
+	AnnotationValueRuntimeDockerPullPolicyDefault DockerPullPolicy = AnnotationValueRuntimeDockerPullPolicyIfNotPresent
 )
 
 // RuntimeDocker uses a Docker daemon to run a Function.
@@ -67,14 +77,15 @@ type RuntimeDocker struct {
 	Stop bool
 
 	// PullPolicy controls how the runtime image is pulled.
-	PullPolicy PullPolicy
+	PullPolicy DockerPullPolicy
 }
 
-// GetPullPolicy extracts PullPolicy configuration from the supplied Function.
-func GetPullPolicy(fn pkgv1beta1.Function) (PullPolicy, error) {
-	switch p := fn.GetAnnotations()[AnnotationKeyRuntimeDockerPullPolicy]; p {
-	case string(AnnotationValueRuntimeDockerPullPolicyAlways), string(AnnotationValueRuntimeDockerPullPolicyNever), string(AnnotationValueRuntimeDockerPullPolicyIfNotPresent):
-		return PullPolicy(p), nil
+// GetDockerPullPolicy extracts PullPolicy configuration from the supplied
+// Function.
+func GetDockerPullPolicy(fn pkgv1beta1.Function) (DockerPullPolicy, error) {
+	switch p := DockerPullPolicy(fn.GetAnnotations()[AnnotationKeyRuntimeDockerPullPolicy]); p {
+	case AnnotationValueRuntimeDockerPullPolicyAlways, AnnotationValueRuntimeDockerPullPolicyNever, AnnotationValueRuntimeDockerPullPolicyIfNotPresent:
+		return p, nil
 	case "":
 		return AnnotationValueRuntimeDockerPullPolicyDefault, nil
 	default:
@@ -82,26 +93,39 @@ func GetPullPolicy(fn pkgv1beta1.Function) (PullPolicy, error) {
 	}
 }
 
+// GetDockerCleanup extracts Cleanup configuration from the supplied Function.
+func GetDockerCleanup(fn pkgv1beta1.Function) (DockerCleanup, error) {
+	switch c := DockerCleanup(fn.GetAnnotations()[AnnotationKeyRuntimeDockerCleanup]); c {
+	case AnnotationValueRuntimeDockerCleanupStop, AnnotationValueRuntimeDockerCleanupOrphan:
+		return c, nil
+	case "":
+		return AnnotationValueRuntimeDockerCleanupDefault, nil
+	default:
+		return "", errors.Errorf("unsupported %q annotation value %q (unknown cleanup policy)", AnnotationKeyRuntimeDockerCleanup, c)
+	}
+}
+
 // GetRuntimeDocker extracts RuntimeDocker configuration from the supplied
 // Function.
 func GetRuntimeDocker(fn pkgv1beta1.Function) (*RuntimeDocker, error) {
+	cleanup, err := GetDockerCleanup(fn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get cleanup policy for Function %q", fn.GetName())
+	}
 	// TODO(negz): Pull package in case it has a different controller image? I
 	// hope in most cases Functions will use 'fat' packages, and it's possible
 	// to manually override with an annotation so maybe not worth it.
-	pullPolicy, err := GetPullPolicy(fn)
+	pullPolicy, err := GetDockerPullPolicy(fn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot get pull policy for Function %q", fn.GetName())
 	}
 	r := &RuntimeDocker{
 		Image:      fn.Spec.Package,
-		Stop:       true,
+		Stop:       cleanup == AnnotationValueRuntimeDockerCleanupStop,
 		PullPolicy: pullPolicy,
 	}
 	if i := fn.GetAnnotations()[AnnotationKeyRuntimeDockerImage]; i != "" {
 		r.Image = i
-	}
-	if fn.GetAnnotations()[AnnotationKeyRuntimeDockerCleanup] == AnnotationValueRuntimeDockerCleanupOrphan {
-		r.Stop = false
 	}
 	return r, nil
 }
