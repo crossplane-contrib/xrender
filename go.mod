@@ -8,6 +8,7 @@ require (
 	github.com/crossplane/crossplane-runtime v1.14.0-rc.0.0.20230908095748-e646d73c92a5
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/google/go-cmp v0.5.9
 	google.golang.org/grpc v1.58.1
 	google.golang.org/protobuf v1.31.0
