@@ -29,25 +29,18 @@ type CLI struct {
 	ObservedResources string `short:"o" type:"existingfile" help:"An optional YAML stream of manifests mocking the observed state of composed resources."`
 }
 
-type Rendered struct {
-	CLI
-
-	Watcher fsnotify.Watcher
-}
-
-type RenderFunc func(*Rendered) error
-
 // Run xrender.
 func (c *CLI) Run() error {
-	r := &Rendered{
-		CLI: *c,
+	ri, err := Initialize(c)
+	if err != nil {
+		return errors.Wrapf(err, "cannot initialize %q", err)
 	}
-	err := r.render()
+	err = RenderInput(ri)
 	if err != nil {
 		return err
 	}
 	if c.Watch {
-		watcher, err := NewWatcher(r)
+		watcher, err := NewWatcher(c)
 		if err != nil {
 			return errors.Wrapf(err, "cannot create file watch %q", err)
 		}
@@ -58,7 +51,11 @@ func (c *CLI) Run() error {
 				select {
 				case event := <-watcher.Events:
 					if event.Has(fsnotify.Write) {
-						r.render()
+						ri.Update(c, event.Name)
+						err := RenderInput(ri)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "Error %s", err)
+						}
 					}
 				case err := <-watcher.Errors:
 					fmt.Fprintf(os.Stderr, "Error %s", err)
@@ -67,49 +64,62 @@ func (c *CLI) Run() error {
 			}
 		}()
 		<-done
-		os.Exit(0)
 	}
 	return nil
 }
-func (r *Rendered) render() error { //nolint:gocyclo // Only a touch over.
-	xr, err := LoadCompositeResource(r.CompositeResource)
-	if err != nil {
-		return errors.Wrapf(err, "cannot load composite resource from %q", r.CompositeResource)
-	}
-
-	// TODO(negz): Should we do some simple validations, e.g. that the
-	// Composition's compositeTypeRef matches the XR's type?
-	comp, err := LoadComposition(r.Composition)
-	if err != nil {
-		return errors.Wrapf(err, "cannot load Composition from %q", r.Composition)
-	}
-
-	if m := comp.Spec.Mode; m == nil || *m != v1.CompositionModePipeline {
-		return errors.Errorf("xrender only supports Composition Function pipelines: Composition %q must use spec.mode: Pipeline", comp.GetName())
-	}
-
-	fns, err := LoadFunctions(r.Functions)
-	if err != nil {
-		return errors.Wrapf(err, "cannot load functions from %q", r.Functions)
-	}
-
-	ors := []composed.Unstructured{}
-	if r.ObservedResources != "" {
-		ors, err = LoadObservedResources(r.ObservedResources)
+func Initialize(c *CLI) (RenderInputs, error) {
+	ri := RenderInputs{}
+	for _, f := range []string{c.CompositeResource, c.Composition, c.Functions, c.ObservedResources} {
+		err := ri.Update(c, f)
 		if err != nil {
-			return errors.Wrapf(err, "cannot load observed composed resources from %q", r.ObservedResources)
+			return ri, err
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
+	return ri, nil
+}
+func (ri *RenderInputs) Update(c *CLI, filename string) error {
+	switch filename {
+	case c.CompositeResource:
+		xr, err := LoadCompositeResource(c.CompositeResource)
+		if err != nil {
+			return errors.Wrapf(err, "cannot load composite resource from %q", c.CompositeResource)
+		}
+		ri.CompositeResource = xr
+	case c.Composition:
+		comp, err := LoadComposition(c.Composition)
+		if err != nil {
+			return errors.Wrapf(err, "cannot load Composition from %q", c.Composition)
+		}
+		if m := comp.Spec.Mode; m == nil || *m != v1.CompositionModePipeline {
+			return errors.Errorf("xrender only supports Composition Function pipelines: Composition %q must use spec.mode: Pipeline", comp.GetName())
+		}
+		ri.Composition = comp
+	case c.Functions:
+		fns, err := LoadFunctions(c.Functions)
+		if err != nil {
+			return errors.Wrapf(err, "cannot load functions from %q", c.Functions)
+		}
+		ri.Functions = fns
+	case c.ObservedResources:
+		ors := []composed.Unstructured{}
+		if c.ObservedResources != "" {
+			var err error
+			ors, err = LoadObservedResources(c.ObservedResources)
+			if err != nil {
+				return errors.Wrapf(err, "cannot load observed composed resources from %q", c.ObservedResources)
+			}
+		}
+		ri.ObservedResources = ors
+	}
+	return nil
+}
+
+func RenderInput(ri RenderInputs) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	out, err := Render(ctx, RenderInputs{
-		CompositeResource: xr,
-		Composition:       comp,
-		Functions:         fns,
-		ObservedResources: ors,
-	})
+	out, err := Render(ctx, ri)
 	if err != nil {
 		return errors.Wrap(err, "cannot render composite resource")
 	}
@@ -123,7 +133,7 @@ func (r *Rendered) render() error { //nolint:gocyclo // Only a touch over.
 
 	y, err := yaml.Marshal(out.CompositeResource.GetUnstructured())
 	if err != nil {
-		return errors.Wrapf(err, "cannot marshal composite resource %q to YAML", xr.GetName())
+		return errors.Wrapf(err, "cannot marshal composite resource %q to YAML", ri.CompositeResource.GetName())
 	}
 	fmt.Printf("---\n%s", y)
 
@@ -137,6 +147,7 @@ func (r *Rendered) render() error { //nolint:gocyclo // Only a touch over.
 	}
 
 	return nil
+
 }
 
 func main() {

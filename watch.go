@@ -5,25 +5,25 @@ import (
 )
 
 // NewWatcher creates a watcher
-func NewWatcher(r *Rendered) (*fsnotify.Watcher, error) {
+func NewWatcher(c *CLI) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return watcher, err
 	}
 
-	err = watcher.Add(r.CompositeResource)
+	err = watcher.Add(c.CompositeResource)
 	if err != nil {
 		return watcher, err
 	}
-	err = watcher.Add(r.Composition)
+	err = watcher.Add(c.Composition)
 	if err != nil {
 		return watcher, err
 	}
-	err = watcher.Add(r.Functions)
+	err = watcher.Add(c.Functions)
 	if err != nil {
 		return watcher, err
 	}
-	err = watcher.Add(r.ObservedResources)
+	err = watcher.Add(c.ObservedResources)
 	if err != nil {
 		return watcher, err
 	}
