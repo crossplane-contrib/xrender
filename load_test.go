@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composite"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 
@@ -191,6 +192,76 @@ func TestLoadFunctions(t *testing.T) {
 			xr, err := LoadFunctions(tc.file)
 
 			if diff := cmp.Diff(tc.want.fns, xr, test.EquateConditions()); diff != "" {
+				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestLoadObservedResources(t *testing.T) {
+
+	type want struct {
+		ors []composed.Unstructured
+		err error
+	}
+	cases := map[string]struct {
+		file string
+		want want
+	}{
+		"Success": {
+			file: "testdata/observed.yaml",
+			want: want{
+				ors: []composed.Unstructured{
+					{
+						Unstructured: unstructured.Unstructured{Object: MustLoadJSON(`{
+							"apiVersion": "example.org/v1alpha1",
+							"kind": "ComposedResource",
+							"metadata": {
+								"name": "test-xrender-a",
+								"annotations": {
+									"crossplane.io/composition-resource-name": "resource-a"
+								}
+							},
+							"spec": {
+								"coolField": "I'm cool!"
+							}
+						}`)},
+					},
+					{
+						Unstructured: unstructured.Unstructured{Object: MustLoadJSON(`{
+							"apiVersion": "example.org/v1alpha1",
+							"kind": "ComposedResource",
+							"metadata": {
+								"name": "test-xrender-b",
+								"annotations": {
+									"crossplane.io/composition-resource-name": "resource-b"
+								}
+							},
+							"spec": {
+								"coolerField": "I'm cooler!"
+							}
+						}`)},
+					},
+				},
+			},
+		},
+		"NoSuchFile": {
+			file: "testdata/nonexist.yaml",
+			want: want{
+				err: cmpopts.AnyError,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			xr, err := LoadObservedResources(tc.file)
+
+			if diff := cmp.Diff(tc.want.ors, xr, test.EquateConditions()); diff != "" {
 				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
 			}
 

@@ -52,10 +52,11 @@ func (c *CLI) Run() error { //nolint:gocyclo // Only a touch over.
 
 	ors := []composed.Unstructured{}
 	for i := range c.ObservedResources {
-		ors, err = LoadObservedResources(c.ObservedResources[i])
+		loaded, err := LoadObservedResources(c.ObservedResources[i])
 		if err != nil {
 			return errors.Wrapf(err, "cannot load observed composed resources from %q", c.ObservedResources[i])
 		}
+		ors = append(ors, loaded...)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
