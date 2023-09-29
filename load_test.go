@@ -116,11 +116,11 @@ func TestLoadComposition(t *testing.T) {
 			xr, err := LoadComposition(tc.file)
 
 			if diff := cmp.Diff(tc.want.comp, xr, test.EquateConditions()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadComposition(..), -want, +got:\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadComposition(..), -want, +got:\n%s", diff)
 			}
 		})
 	}
@@ -192,11 +192,11 @@ func TestLoadFunctions(t *testing.T) {
 			xr, err := LoadFunctions(tc.file)
 
 			if diff := cmp.Diff(tc.want.fns, xr, test.EquateConditions()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadFunctions(..), -want, +got:\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadFunctions(..), -want, +got:\n%s", diff)
 			}
 		})
 	}
@@ -262,11 +262,11 @@ func TestLoadObservedResources(t *testing.T) {
 			xr, err := LoadObservedResources(tc.file)
 
 			if diff := cmp.Diff(tc.want.ors, xr, test.EquateConditions()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadObservedResources(..), -want, +got:\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("LoadCompositeResource(..), -want, +got:\n%s", diff)
+				t.Errorf("LoadObservedResources(..), -want, +got:\n%s", diff)
 			}
 		})
 	}
