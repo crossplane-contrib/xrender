@@ -4,10 +4,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
@@ -25,6 +26,7 @@ type CLI struct {
 	Functions         string `arg:"" help:"A stream or directory of YAML manifests containing the Composition Functions to use."`
 
 	ObservedResources []string `short:"o" help:"An optional stream or directory of YAML manifests mocking the observed state of composed resources."`
+	IncludeResults    bool     `short:"r" default:"true" help:"Include Results in the output. Results are emitted as a 'fake' KRM-like object of kind: Result."`
 }
 
 // Run xrender.
@@ -79,19 +81,28 @@ func (c *CLI) Run() error { //nolint:gocyclo // Only a touch over.
 	// server-side apply would do (e.g. merging vs atomically replacing arrays)
 	// and we don't have enough context (i.e. OpenAPI schemas) to do that.
 
-	y, err := yaml.Marshal(out.CompositeResource.GetUnstructured())
-	if err != nil {
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{Yaml: true})
+
+	fmt.Println("---")
+	if err := s.Encode(out.CompositeResource, os.Stdout); err != nil {
 		return errors.Wrapf(err, "cannot marshal composite resource %q to YAML", xr.GetName())
 	}
-	fmt.Printf("---\n%s", y)
 
-	for _, cd := range out.ComposedResources {
-		y, err := yaml.Marshal(cd.GetUnstructured())
-		if err != nil {
+	for i := range out.ComposedResources {
+		fmt.Println("---")
+		if err := s.Encode(&out.ComposedResources[i], os.Stdout); err != nil {
 			// TODO(negz): Use composed name annotation instead.
-			return errors.Wrapf(err, "cannot marshal composed resource %q to YAML", cd.GetName())
+			return errors.Wrapf(err, "cannot marshal composed resource %q to YAML", out.ComposedResources[i].GetName())
 		}
-		fmt.Printf("---\n%s", y)
+	}
+
+	if c.IncludeResults {
+		for i := range out.Results {
+			fmt.Println("---")
+			if err := s.Encode(&out.Results[i], os.Stdout); err != nil {
+				return errors.Wrap(err, "cannot marshal result to YAML")
+			}
+		}
 	}
 
 	return nil

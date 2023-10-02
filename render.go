@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/structpb"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -51,6 +52,7 @@ type RenderInputs struct {
 type RenderOutputs struct {
 	CompositeResource *composite.Unstructured
 	ComposedResources []composed.Unstructured
+	Results           []unstructured.Unstructured
 
 	// TODO(negz): Allow returning desired XR connection details. Maybe as a
 	// Secret? Should we honor writeConnectionSecretToRef? What if secret stores
@@ -103,6 +105,8 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 	// The Function pipeline starts with empty desired state.
 	d := &fnv1beta1.State{}
 
+	results := make([]unstructured.Unstructured, 0)
+
 	// Run any Composition Functions in the pipeline. Each Function may mutate
 	// the desired state returned by the last, and each Function may produce
 	// results.
@@ -135,7 +139,13 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 			case fnv1beta1.Severity_SEVERITY_FATAL:
 				return RenderOutputs{}, errors.Errorf("pipeline step %q returned a fatal result: %s", fn.Step, rs.Message)
 			default:
-				// TODO(negz): Log to stderr?
+				results = append(results, unstructured.Unstructured{Object: map[string]any{
+					"apiVersion": "xrender.crossplane.io/v1beta1",
+					"kind":       "Result",
+					"step":       fn.Step,
+					"severity":   rs.GetSeverity().String(),
+					"message":    rs.GetMessage(),
+				}})
 			}
 		}
 	}
@@ -174,7 +184,7 @@ func Render(ctx context.Context, in RenderInputs) (RenderOutputs, error) { //nol
 	xr.SetKind(in.CompositeResource.GetKind())
 	xr.SetName(in.CompositeResource.GetName())
 
-	return RenderOutputs{CompositeResource: xr, ComposedResources: desired}, nil
+	return RenderOutputs{CompositeResource: xr, ComposedResources: desired, Results: results}, nil
 }
 
 // RenderComposedResourceMetadata sets standard, required composed resource
