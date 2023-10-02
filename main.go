@@ -26,7 +26,7 @@ type CLI struct {
 	Functions         string `arg:"" help:"A stream or directory of YAML manifests containing the Composition Functions to use."`
 
 	ObservedResources []string `short:"o" help:"An optional stream or directory of YAML manifests mocking the observed state of composed resources."`
-	IncludeResults    bool     `short:"r" help:"Include Results in the output. Results are emitted as a 'fake' KRM-like object of kind: Result."`
+	IncludeResults    bool     `short:"r" default:"true" help:"Include Results in the output. Results are emitted as a 'fake' KRM-like object of kind: Result."`
 }
 
 // Run xrender.
