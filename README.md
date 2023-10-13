@@ -1,6 +1,7 @@
 # xrender
 
-Locally render any XR that uses Composition Functions.
+> [!IMPORTANT]
+> `xrender` is now `crossplane render`, which lives at https://github.com/crossplane/crossplane.
 
 ```shell
 # Install xrender
